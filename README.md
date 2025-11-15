@@ -8,6 +8,8 @@ Brainlove is (almost) a superset of Brainfuck with additional features to make i
 
 - Real comments
 
+- Functions (unstable)
+
 - Brainlove also has its own additional commands (see below)
 
 ## Additions
@@ -28,6 +30,32 @@ $Example:$
 ```
 bl main.bl
 $$
+```
+
+### Functions
+
+Functions are able to be declared and run several times.
+Defined with `f"name"`, called with `c"name"`.
+
+Note that functions are brand new and very unstable. Loops will not work in them and there is little syntax checks.
+
+$Example:$
+```
+# main.bl
+f"addp" .+.
+
++++ +++ [> +++ +++ <-] >
+> +++ +++ +++ +
+< c"addp" >.
+< c"addp" >.
+< c"addp" >.
+< c"addp" >.
+```
+```
+$%
+%&
+&'
+'(
 ```
 
 ### Debug: `?`
