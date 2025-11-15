@@ -18,24 +18,22 @@ State::State(const char* path)
     // Push all symbols into the symbol vector.
     bool inComments = false;
     for (char c: s) {
+        // If in comments, ignore everything until a new line.
         if (inComments) {
-            // If in comments, ignore everything until a new line.
             inComments = c != '\n';
-            continue;
-        } else if (std::isspace(c)) {
-            // Ignore all whitespace.
             continue;
         }
 
-        // If the character doesn't match a symbol, enter comments.
+        // Ignore anything that isn't a symbol.
         auto symbol = get_symbol(c);
-        if (!symbol.has_value()) {
+        if (symbol) {
+            symbols.push_back(*symbol);
+        } else if (c == '#') {
             inComments = true;
-        } else {
-            symbols.push_back(symbol.value());
         }
     }
 
+    // This will never change in size from now on.
     symbols.shrink_to_fit();
 }
 
@@ -48,9 +46,11 @@ bool State::is_done() const {
 }
 
 void State::process() {
+    // Used in scopes ('[', ']').
     u32 scopes = 0;
 
     switch (symbols[i]) {
+        // Brainfuck standard:
         case Symbol::Inc:
             mem[p] ++;
             break;
@@ -58,15 +58,15 @@ void State::process() {
             mem[p] --;
             break;
         case Symbol::MoveL:
-            p = p == 0 ? State::Z_MEM - 1 : p - 1;
+            p = (p == 0 ? State::Z_MEM : p) - 1;
             break;
         case Symbol::MoveR:
             p = (p + 1) % State::Z_MEM;
             break;
-        case Symbol::Read:
+        case Symbol::ReadC:
             mem[p] = std::getchar();
             break;
-        case Symbol::Print:
+        case Symbol::PrintC:
             std::putchar(char(mem[p]));
             break;
         case Symbol::WhileOpen:
@@ -84,6 +84,19 @@ void State::process() {
                 scopes += u32(symbols[i] == Symbol::WhileClose);
                 scopes -= u32(symbols[i] == Symbol::WhileOpen);
             }
+            break;
+
+        // Brainlove features:
+        case Symbol::Debug:
+        std::printf("\n?{ @ cell #%zu; = %u }\n", p, mem[p]);
+            break;
+        case Symbol::ReadS:
+            std::fgets((char*)(mem + p), State::Z_MEM - p, stdin);
+            break;
+        case Symbol::PrintS:
+            size max = State::Z_MEM - p;
+            for (size q = p; mem[q] != 0 && q < State::Z_MEM; q++)
+                std::putchar(mem[q]);
             break;
     }
 

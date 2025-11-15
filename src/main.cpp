@@ -13,6 +13,4 @@ i32 main(i32 nArgs, const char** args) {
     while (!s.is_done()) {
         s.process();
     }
-
-    std::putchar('\n');
 }

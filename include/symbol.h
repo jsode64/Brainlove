@@ -3,6 +3,8 @@
 #include <optional>
 
 enum class Symbol {
+    // Brainfuck standard:
+
     /** @brief Increment: `+`. */
     Inc,
 
@@ -16,16 +18,27 @@ enum class Symbol {
     MoveR,
 
     /** @brief Read character: `,`. */
-    Read,
+    ReadC,
 
     /** @brief Print character: `.`. */
-    Print,
+    PrintC,
 
     /** @brief While loop open: `[`. */
     WhileOpen,
 
     /** @brief While loop close: `]`. */
     WhileClose,
+
+    // Brainlove features:
+
+    /** @brief Debug: `?` */
+    Debug,
+
+    /** @brief Read string: `;` */
+    ReadS,
+
+    /** @brief Print string: `:` */
+    PrintS,
 };
 
 /**
