@@ -37,8 +37,6 @@ $$
 Functions are able to be declared and run several times.
 Defined with `f"name"`, called with `c"name"`.
 
-Note that functions are brand new and very unstable. Loops will not work in them and there is little syntax checks.
-
 $Example:$
 ```
 # main.bl

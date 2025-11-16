@@ -15,8 +15,8 @@ private:
     /** @brief An array of all symbols. */
     std::vector<Token> toks;
 
-    /** @brief The index of the token to process. */
-    size iTok;
+    /** @brief The next token to process. */
+    Token* tok;
 
     /** @brief The array of bytes that serve as the program memory. */
     byte mem[State::Z_MEM];
@@ -25,7 +25,7 @@ private:
     size p;
 
     /** @brief A map from function name to operations */
-    std::unordered_map<std::string, std::vector<Symbol>> fnMap;
+    std::unordered_map<std::string, std::vector<Token>> fnMap;
 
 public:
     /**
@@ -62,6 +62,16 @@ private:
     std::string parse_fn_name(const std::string& s, size i);
 
     /**
+     * @brief Process the given symbol.
+     * 
+     * @param symbol The symbol to process.
+     * @param tok A pointer to the current token.
+     * 
+     * @return A pointer to the next token to process.
+     */
+    Token* process_symbol(Symbol symbol, Token* tok);
+
+    /**
      * @brief Reads and adds the function to the map.
      * 
      * @param s The source code.
@@ -71,9 +81,9 @@ private:
      */
     size add_fn(const std::string& s, size i);
 
-    /** @brief Processes the given symbol. */
-    void process_symbol(Symbol symbol);
-
     /** @brief Processes/runs the given function by name. */
     void process_fn(const std::string& name);
+
+    /** @brief Processes the given token. */
+    void process_tok(Token** tok);
 };

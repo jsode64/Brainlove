@@ -9,7 +9,7 @@ template<class... Ts> struct TokMap : Ts... { using Ts::operator()...; };
 template<class... Ts> TokMap(Ts...) -> TokMap<Ts...>;
 
 State::State(const char* path)
-    : toks(), iTok(0), mem{0}, p(0), fnMap() {
+    : toks(), tok(nullptr), mem{0}, p(0), fnMap() {
     // Load the file into a string.
     std::ifstream f(path, std::ios::binary | std::ios::ate);
     std::string s;
@@ -53,6 +53,7 @@ State::State(const char* path)
 
     // This will never change in size from now on.
     toks.shrink_to_fit();
+    tok = toks.data();
 }
 
 State::~State() {
@@ -60,60 +61,30 @@ State::~State() {
 }
 
 bool State::is_done() const {
-    return iTok >= toks.size();
+    return tok >= toks.data() + toks.size();
 }
 
 void State::process() {
-    std::visit(
-        TokMap{
-            [&](Symbol symbol){ process_symbol(symbol); },
-            [&](FnCall fnCall){ process_fn(fnCall.name); },
-        },
-        toks[iTok]
-    );
-
-    iTok++;
+    process_tok(&tok);
 }
 
 std::string State::parse_fn_name(const std::string& s, size i) {
     // Syntax check for quotes surrounding function name.
-    size start = i;
-    if (s[i] != '"') {
+    const char* c = s.data() + i;
+    if (*(c++) != '"') {
         std::fprintf(stderr, "Expected '\"' for function definition after 'f', found %c\n", s[i]);
         exit(1);
     }
 
     // Get name.
-    i++;
     std::string name;
-    while (s[i] != '"' && i < s.size()) {
-        name.push_back(s[i]);
-        i++;
-    }
+    for (;*c != '"' && c < s.data() + s.size(); c++)
+        name.push_back(*c);
 
     return name;
 }
 
-size State::add_fn(const std::string& s, size i) {
-    size start = 0;
-    auto name = State::parse_fn_name(s, i);
-    std::vector<Symbol> symbols;
-    i += name.size() + 2;
-
-    while (s[i] != '\n' && s[i] != '#') {
-        auto symbol = get_symbol(s[i]);
-        if (symbol) {
-            symbols.push_back(*symbol);
-        }
-        i++;
-    }
-
-    symbols.shrink_to_fit();
-    fnMap.emplace(std::move(name), std::move(symbols));
-    return i - start;
-}
-
-void State::process_symbol(Symbol symbol) {
+Token* State::process_symbol(Symbol symbol, Token* tok) {
     // Used in scopes ('[', ']').
     u32 scopes = 0;
 
@@ -139,18 +110,18 @@ void State::process_symbol(Symbol symbol) {
             break;
         case Symbol::WhileOpen:
             scopes = u32(mem[p] == 0);
-            while (scopes > 0 && iTok + 1 < toks.size()) {
-                iTok++;
-                scopes += u32(token_is_symbol(toks[iTok], Symbol::WhileOpen));
-                scopes -= u32(token_is_symbol(toks[iTok], Symbol::WhileClose));
+            while (scopes > 0) {
+                tok++;
+                scopes += u32(token_is_symbol(*tok, Symbol::WhileOpen));
+                scopes -= u32(token_is_symbol(*tok, Symbol::WhileClose));
             }
             break;
         case Symbol::WhileClose:
             scopes = u32(mem[p] != 0);
-            while (scopes > 0 && iTok > 0) {
-                iTok--;
-                scopes += u32(token_is_symbol(toks[iTok], Symbol::WhileClose));
-                scopes -= u32(token_is_symbol(toks[iTok], Symbol::WhileOpen));
+            while (scopes > 0) {
+                tok--;
+                scopes += u32(token_is_symbol(*tok, Symbol::WhileClose));
+                scopes -= u32(token_is_symbol(*tok, Symbol::WhileOpen));
             }
             break;
 
@@ -167,14 +138,66 @@ void State::process_symbol(Symbol symbol) {
                 std::putchar(mem[q]);
             break;
     }
+
+    return tok + 1;
+}
+
+size State::add_fn(const std::string& s, size i) {
+    size beg = i;
+    auto name = State::parse_fn_name(s, i);
+    std::vector<Token> toks;
+    bool inComments = false;
+
+    i += name.size() + 2;
+    for (;s[i] != '\n' && i < s.size() - beg; i++) {
+        char c = s[i];
+
+        // If in comments, skip until new line or end.
+        if (inComments) {
+            continue;
+        }
+
+        // Function call.
+        if (c == 'c') {
+            auto name = parse_fn_name(s, i + 1);
+            i += name.size() + 1;
+            toks.emplace_back(FnCall(std::move(name)));
+        }
+
+        // Ignore anything that isn't a symbol.
+        auto symbol = get_symbol(c);
+        if (symbol) {
+            toks.emplace_back(*symbol);
+        } else {
+            inComments = c == 'c';
+        }
+    }
+
+    toks.shrink_to_fit();
+    fnMap.emplace(std::move(name), std::move(toks));
+    return i - beg;
 }
 
 void State::process_fn(const std::string& name) {
-    auto& symbols = fnMap[name];
-    size i = 0;
-
-    for (const auto symbol: symbols) {
-        process_symbol(symbol);
-        i++;
+    // Make sure the function is defined.
+    if (!fnMap.contains(name)) {
+        std::fprintf(stderr, "Call to an undefined funtion: '%s'\n", name.c_str());
+        std::exit(1);
     }
+
+    // Run the tokens.
+    auto& toks = fnMap[name];
+    Token* tok = toks.data();
+    for (Token* tok = toks.data(); tok < toks.data() + toks.size();)
+        process_tok(&tok);
+}
+
+void State::process_tok(Token** tok) {
+    std::visit(
+        TokMap{
+            [&](Symbol symbol){ *tok = process_symbol(symbol, *tok); },
+            [&](FnCall fnCall){ process_fn(fnCall.name); (*tok)++; },
+        },
+        **tok
+    );
 }
